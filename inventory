@@ -14,7 +14,6 @@
 webserver
 docker
 unifi
-#ntp
 
 
 [ubuntu:vars]

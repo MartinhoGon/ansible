@@ -88,8 +88,19 @@
         - { src: "/etc/fail2ban/jail.local", regexp: "^bantime", line: "bantime = 10m" }
         - { src: "/etc/fail2ban/jail.local", regexp: "^maxtry", line: "maxtry = 5" }
         - { src: "/etc/fail2ban/jail.local", regexp: "^backend", line: "backend = systemd" }
-      notify: 
+      notify:
         - restart fail2ban
+
+    - name: Configurar cliente NTP - Editar ficheiro.
+      lineinfile:
+        path: /etc/systemd/timesyncd.conf
+        regexp: '^#NTP'
+        line: NTP=10.101.12.50
+
+    - name: Configurar cliente NTP - restart servico.
+      shell: |
+             timedatectl set-ntp off
+             timedatectl set-ntp on
 
     - name: Configurar UFW para permitir SSH & snmp
       ufw:
