@@ -27,7 +27,7 @@
     
     - name: garantir que o snmp esta a correr
       service:
-        name: snmp
+        name: snmpd
         state: started
         enabled: yes
 
