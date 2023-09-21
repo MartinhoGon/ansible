@@ -1,0 +1,125 @@
+---
+- name: Configuração inicial de uma maquina ubuntu
+  hosts: ubuntu
+  become: true
+
+  handlers:
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
+
+    - name: restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
+    
+    - name: restart snmp
+      service:
+        name: snmp
+        state: restarted
+    
+    - name: garantir que o fail2ban esta a correr
+      service:
+        name: fail2ban
+        state: started
+        enabled: yes
+    
+    - name: garantir que o snmp esta a correr
+      service:
+        name: snmp
+        state: started
+        enabled: yes
+
+  pre_tasks:
+    - name: Update apt cache and upgrade dist.
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+        upgrade: dist
+
+  tasks:
+    - name: Adicionar redes permitidas ao ssh.
+      lineinfile:
+        path: /etc/hosts.allow
+        line: "{{ item }}"
+        state: present
+        backup: true
+      loop:
+        - "sshd: 10.101.0.0/24"
+        - "sshd: 10.101.2.0/24"
+        - "sshd: 10.101.12.0/24"
+      notify:
+        - restart ssh
+
+    - name: Definir timezone
+      timezone:
+        name: Europe/Lisbon
+
+    - name: Instalar pacotes - fail2ban & snmp.
+      apt:
+        state: present
+        name:
+          - fail2ban
+          - snmp
+        notify:
+          - garantir que o fail2ban esta a correr
+          - garantir que o snmp esta a correr
+    
+    - name: Configurar o fail2ban - Copiar ficheiros de configuração.
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+        mode: 0644
+      loop:
+        - { src: "/etc/fail2ban/fail2ban.conf", dest: "/etc/fail2ban/fail2ban.local" }
+        - { src: "/etc/fail2ban/jail.conf", dest: "/etc/fail2ban/jail.local" }
+
+    - name: Configurar o fail2ban - editar ficheiro
+      lineinfile:
+        path: "{{ item.src }}"
+        regexp: " {{ item.regexp }} "
+        line: " {{ item.line }} "
+      loop:
+        - { src: "/etc/fail2ban/fail2ban.local" , regexp: "^loglevel", line: "loglevel = INFO" }
+        - { src: "/etc/fail2ban/fail2ban.local", regexp: "^logtarget", line: "logtarget = /var/log/fail2ban.log" }
+        - { src: "/etc/fail2ban/jail.local", regexp: "^bantime", line: "bantime = 10m" }
+        - { src: "/etc/fail2ban/jail.local", regexp: "^maxtry", line: "maxtry = 5" }
+        - { src: "/etc/fail2ban/jail.local", regexp: "^backend", line: "backend = systemd" }
+      notify: 
+        - restart fail2ban
+
+    - name: Configurar cliente NTP - Editar ficheiro.
+      lineinfile:
+        path: /etc/systemd/timesyncd.conf
+        regexp: '^#NTP'
+        line: NTP=10.101.12.50
+    
+    - name: Configurar cliente NTP - restart servico.
+      shell: |
+             timedatectl set-ntp off
+             timedatectl set-ntp on
+
+    - name: Configurar UFW para permitir SSH & snmp
+      ufw:
+        state: enabled
+        port: {{ item }}
+        rule: allow
+      loop:
+        - ssh
+        - snmp
+
+    - name: Configurar o snmp v2c - Copiar ficheiros de configuração.
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+        mode: 0600
+      loop:
+        - { src: "/etc/snmp/snmpd.conf", dest: "/etc/snmp/snmpd.conf.bak" }
+        - { src: "snmpd.conf", dest: "/etc/snmp/snmpd.conf" }
+      notify: 
+        - restart snmp
