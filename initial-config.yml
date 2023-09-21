@@ -16,7 +16,7 @@
     
     - name: restart snmp
       service:
-        name: snmp
+        name: snmpd
         state: restarted
     
     - name: garantir que o fail2ban esta a correr
@@ -58,24 +58,27 @@
 
     - name: Instalar pacotes - fail2ban & snmp.
       apt:
-        state: present
-        name:
+        pkg:
           - fail2ban
           - snmp
-        notify:
-          - garantir que o fail2ban esta a correr
-          - garantir que o snmp esta a correr
+          - snmpd
+          - libsnmp-dev
+        state: present
+      notify:
+        - garantir que o fail2ban esta a correr
+        - garantir que o snmp esta a correr
     
     - name: Configurar o fail2ban - Copiar ficheiros de configuração.
       copy:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
+        remote_src: "{{ item.remote_src }}"
         owner: root
         group: root
         mode: 0644
       loop:
-        - { src: "/etc/fail2ban/fail2ban.conf", dest: "/etc/fail2ban/fail2ban.local" }
-        - { src: "/etc/fail2ban/jail.conf", dest: "/etc/fail2ban/jail.local" }
+        - { remote_src: true, src: "/etc/fail2ban/fail2ban.conf", dest: "/etc/fail2ban/fail2ban.local" }
+        - { remote_src: true, src: "/etc/fail2ban/jail.conf", dest: "/etc/fail2ban/jail.local" }
 
     - name: Configurar o fail2ban - editar ficheiro
       lineinfile:
@@ -105,7 +108,7 @@
     - name: Configurar UFW para permitir SSH & snmp
       ufw:
         state: enabled
-        port: {{ item }}
+        port: "{{ item }}"
         rule: allow
       loop:
         - ssh
@@ -115,11 +118,12 @@
       copy:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
+        remote_src: "{{ item.remote_src }}"
         owner: root
         group: root
         mode: 0600
       loop:
-        - { src: "/etc/snmp/snmpd.conf", dest: "/etc/snmp/snmpd.conf.bak" }
-        - { src: "snmpd.conf", dest: "/etc/snmp/snmpd.conf" }
-      notify: 
+        - { remote_src: true, src: "/etc/snmp/snmpd.conf", dest: "/etc/snmp/snmpd.conf.bak" }
+        - { remote_src: false, src: "./snmpd.conf", dest: "/etc/snmp/snmpd.conf" }
+      notify:
         - restart snmp

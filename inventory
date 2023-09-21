@@ -14,7 +14,3 @@
 webserver
 docker
 unifi
-
-
-[ubuntu:vars]
-ansible_ssh_user=administrador
