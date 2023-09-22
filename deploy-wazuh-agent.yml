@@ -1,0 +1,28 @@
+---
+- name: Fazer o deploy do agente do wazuh
+  hosts: ubuntu
+  become: true
+
+  vars:
+    MANAGER_IP: X.X.X.X
+
+  tasks:
+    - name: Obter nome da máquina.
+      command: "hostname -f"
+      register: hostname
+
+    - name: Download wazuh agent.
+      get_url:
+        url: 'https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_4.5.2-1_amd64.deb'
+        dest: /home/administrador/wazuh-agent.deb
+        mode: 0770
+
+    - name: Correr o instalador
+      command: "WAZUH_MANAGER='{{ MANAGER_IP }}' WAZUH_AGENT_GROUP='Linux-Servers' WAZUH_AGENT_NAME='{{hostname.stdout}}' dpkg -i /home/administrador/wazuh-agent.deb"
+
+    - name: Enable and start wazuh agent.
+      service:
+        name: wazuh-agent
+        daemon_reload: true
+        state: started
+        enabled: true
